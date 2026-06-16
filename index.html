@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>行程规划 · 每日安排</title>
+<style>
+/* ========== 变量与重置 ========== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f5f7; --card:#fff; --text:#1d1d1f; --sub:#86868b;
+  --border:#e5e5ea; --accent:#0071e3; --accent-light:#e8f2fd;
+  --danger:#ff3b30; --shadow:0 2px 12px rgba(0,0,0,.08);
+  --radius:12px; --radius-sm:8px;
+  --cat-transport:#0071e3; --cat-hotel:#8e44ad; --cat-attraction:#2ecc71;
+  --cat-food:#f39c12; --cat-shopping:#e91e63; --cat-other:#73818b;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+button{border:none;cursor:pointer;font-family:inherit;font-size:inherit}
+input,select,textarea{font-family:inherit;font-size:inherit;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;outline:none;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light)}
+
+/* ========== 头部 ========== */
+.header{
+  background:var(--card);padding:12px 20px;display:flex;align-items:center;gap:12px;
+  border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;flex-wrap:wrap;
+  box-shadow:var(--shadow);
+}
+.header .logo{font-size:20px;font-weight:700;white-space:nowrap}
+.header .logo span{color:var(--accent)}
+.view-btns{display:flex;background:var(--bg);border-radius:var(--radius-sm);overflow:hidden;flex-shrink:0}
+.view-btns button{padding:6px 16px;font-size:14px;font-weight:500;color:var(--sub);background:transparent;transition:all .2s}
+.view-btns button.active{background:var(--accent);color:#fff}
+.nav-arrows{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.nav-arrows button{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:transparent;font-size:18px;color:var(--text);transition:background .2s}
+.nav-arrows button:hover{background:var(--bg)}
+.nav-arrows .date-label{font-size:15px;font-weight:600;min-width:120px;text-align:center}
+.btn-today{padding:6px 14px;border-radius:20px;font-size:13px;font-weight:500;background:var(--bg);color:var(--text)}
+.btn-add{padding:8px 18px;border-radius:20px;font-size:14px;font-weight:600;background:var(--accent);color:#fff;margin-left:auto;display:flex;align-items:center;gap:6px;transition:opacity .2s}
+.btn-add:hover{opacity:.85}
+.btn-add::before{content:"＋";font-size:18px}
+
+/* ========== 主布局 ========== */
+.main{display:flex;flex:1;overflow:hidden;height:calc(100vh - 120px)}
+.panel-calendar{width:380px;flex-shrink:0;background:var(--card);border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;overflow-y:auto}
+.panel-timeline{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* ========== 日历 ========== */
+.calendar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.calendar-header .month-label{font-size:18px;font-weight:700}
+.weekday-row{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:12px;color:var(--sub);font-weight:500;margin-bottom:8px}
+.day-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;flex:1}
+.day-cell{
+  aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border-radius:var(--radius-sm);cursor:pointer;font-size:14px;position:relative;transition:background .15s;
+  min-width:0;
+}
+.day-cell:hover{background:var(--bg)}
+.day-cell.today{background:var(--accent-light);font-weight:700;color:var(--accent)}
+.day-cell.selected{background:var(--accent);color:#fff;font-weight:700}
+.day-cell.selected .dots .dot{background:#fff}
+.day-cell.other-month{color:#ccc;pointer-events:none}
+.day-cell .day-num{position:relative;z-index:1}
+.day-cell .dots{display:flex;gap:2px;position:absolute;bottom:4px}
+.day-cell .dots .dot{width:5px;height:5px;border-radius:50%}
+
+/* ========== 周视图 ========== */
+.week-grid{display:flex;flex:1;gap:4px}
+.week-col{flex:1;display:flex;flex-direction:column;border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--border);cursor:pointer;transition:all .15s;min-width:0}
+.week-col:hover{border-color:var(--accent)}
+.week-col.selected{border-color:var(--accent);background:var(--accent-light)}
+.week-col .week-day-header{text-align:center;padding:8px 4px;font-size:12px;color:var(--sub);border-bottom:1px solid var(--border)}
+.week-col .week-day-num{text-align:center;padding:4px;font-size:20px;font-weight:600}
+.week-col.today{background:var(--accent-light)}
+.week-col.today .week-day-num{color:var(--accent)}
+.week-col .week-events{flex:1;padding:4px;overflow-y:auto;font-size:11px}
+.week-col .week-event{padding:2px 4px;margin:1px 0;border-radius:3px;color:#fff;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5}
+
+/* ========== 时间线面板 ========== */
+.timeline-top{
+  padding:16px 20px 12px;background:var(--card);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+.timeline-top .selected-date{font-size:18px;font-weight:700;white-space:nowrap}
+.timeline-top .selected-date small{font-size:13px;color:var(--sub);font-weight:400}
+.filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin-left:8px}
+.filter-chip{
+  padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500;
+  background:var(--bg);color:var(--sub);transition:all .2s;white-space:nowrap;
+}
+.filter-chip.active{background:var(--accent);color:#fff}
+.filter-chip[data-cat="transport"].active{background:var(--cat-transport)}
+.filter-chip[data-cat="hotel"].active{background:var(--cat-hotel)}
+.filter-chip[data-cat="attraction"].active{background:var(--cat-attraction)}
+.filter-chip[data-cat="food"].active{background:var(--cat-food)}
+.filter-chip[data-cat="shopping"].active{background:var(--cat-shopping)}
+.filter-chip[data-cat="other"].active{background:var(--cat-other)}
+
+.timeline-list{flex:1;overflow-y:auto;padding:16px 20px}
+.timeline-empty{text-align:center;color:var(--sub);padding:60px 20px}
+.timeline-empty .icon{font-size:48px;margin-bottom:12px}
+.timeline-empty p{font-size:14px}
+
+.event-card{
+  display:flex;gap:12px;padding:14px;margin-bottom:10px;background:var(--card);
+  border-radius:var(--radius);box-shadow:var(--shadow);cursor:pointer;transition:transform .15s,box-shadow .15s;
+  border-left:4px solid var(--border);
+}
+.event-card:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.event-card .time-col{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:52px}
+.event-card .time-col .time{font-size:15px;font-weight:600}
+.event-card .time-col .cat-dot{width:10px;height:10px;border-radius:50%}
+.event-card .info{flex:1;min-width:0}
+.event-card .info .title{font-size:15px;font-weight:600;margin-bottom:4px}
+.event-card .info .note{font-size:13px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.event-card .cost{font-size:14px;font-weight:600;color:var(--danger);white-space:nowrap;align-self:center}
+
+/* 标签颜色标记 */
+.cat-transport{border-left-color:var(--cat-transport)}.cat-transport .cat-dot{background:var(--cat-transport)}
+.cat-hotel{border-left-color:var(--cat-hotel)}.cat-hotel .cat-dot{background:var(--cat-hotel)}
+.cat-attraction{border-left-color:var(--cat-attraction)}.cat-attraction .cat-dot{background:var(--cat-attraction)}
+.cat-food{border-left-color:var(--cat-food)}.cat-food .cat-dot{background:var(--cat-food)}
+.cat-shopping{border-left-color:var(--cat-shopping)}.cat-shopping .cat-dot{background:var(--cat-shopping)}
+.cat-other{border-left-color:var(--cat-other)}.cat-other .cat-dot{background:var(--cat-other)}
+
+/* ========== 底部状态栏 ========== */
+.footer{
+  background:var(--card);border-top:1px solid var(--border);padding:10px 20px;
+  display:flex;justify-content:space-between;align-items:center;font-size:13px;
+  color:var(--sub);flex-wrap:wrap;gap:8px;
+}
+.footer strong{color:var(--text);font-size:15px}
+.footer .day-budget strong{color:var(--accent)}
+
+/* ========== 弹窗 ========== */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.modal{
+  background:var(--card);border-radius:var(--radius);padding:24px;width:100%;max-width:420px;
+  box-shadow:0 20px 60px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto;
+}
+.modal h3{font-size:18px;margin-bottom:16px}
+.modal .field{margin-bottom:14px}
+.modal .field label{display:block;font-size:13px;font-weight:600;color:var(--sub);margin-bottom:4px}
+.modal .row{display:flex;gap:10px}
+.modal .row .field{flex:1}
+.modal .cat-options{display:flex;gap:6px;flex-wrap:wrap}
+.modal .cat-options button{
+  padding:6px 12px;border-radius:20px;font-size:12px;font-weight:500;
+  background:var(--bg);color:var(--sub);border:2px solid transparent;transition:all .2s;
+}
+.modal .cat-options button.selected{border-color:var(--accent);color:var(--accent);background:var(--accent-light)}
+.modal .actions{display:flex;gap:10px;margin-top:20px}
+.modal .actions button{flex:1;padding:10px;border-radius:var(--radius-sm);font-weight:600;font-size:14px}
+.btn-save{background:var(--accent);color:#fff}
+.btn-delete{background:transparent;color:var(--danger);border:1px solid var(--danger)!important}
+.btn-cancel{background:var(--bg);color:var(--text)}
+
+/* ========== 响应式 ========== */
+@media(max-width:768px){
+  .main{flex-direction:column;height:auto}
+  .panel-calendar{width:100%;flex-shrink:1;border-right:none;border-bottom:1px solid var(--border);max-height:380px}
+  .header{padding:10px 12px;gap:8px}
+  .header .logo{font-size:17px}
+  .btn-add{font-size:13px;padding:6px 14px}
+  .view-btns button{padding:5px 10px;font-size:12px}
+  .nav-arrows .date-label{font-size:14px;min-width:auto}
+  .timeline-top{padding:12px;flex-direction:column;align-items:flex-start}
+  .filter-bar{margin-left:0}
+  .event-card{padding:10px 12px}
+  .modal{margin:10px;padding:16px;max-width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- ========== 头部 ========== -->
+<header class="header">
+  <div class="logo">🗺️ 行程<span>规划</span></div>
+  <div class="view-btns" id="viewBtns">
+    <button data-view="month" class="active">月</button>
+    <button data-view="week">周</button>
+    <button data-view="day">日</button>
+  </div>
+  <div class="nav-arrows">
+    <button id="btnPrev" title="上一个月/周">◀</button>
+    <span class="date-label" id="dateLabel">2026年6月</span>
+    <button id="btnNext" title="下一个月/周">▶</button>
+  </div>
+  <button class="btn-today" id="btnToday">今天</button>
+  <button class="btn-add" id="btnAdd">新增行程</button>
+</header>
+
+<!-- ========== 主区域 ========== -->
+<div class="main">
+  <!-- 日历面板 -->
+  <div class="panel-calendar" id="panelCalendar">
+    <div class="weekday-row" id="weekdayRow"></div>
+    <div class="day-grid" id="dayGrid"></div>
+    <div class="week-grid" id="weekGrid" style="display:none"></div>
+  </div>
+
+  <!-- 时间线面板 -->
+  <div class="panel-timeline">
+    <div class="timeline-top">
+      <div class="selected-date" id="selectedDateLabel">6月16日 星期一 <small>今天</small></div>
+      <div class="filter-bar" id="filterBar"></div>
+    </div>
+    <div class="timeline-list" id="timelineList"></div>
+  </div>
+</div>
+
+<!-- ========== 底部状态栏 ========== -->
+<footer class="footer">
+  <div class="day-budget">📅 当日花费 <strong id="dayBudget">¥0</strong></div>
+  <div>|</div>
+  <div class="month-budget">📊 当月总花费 <strong id="monthBudget">¥0</strong></div>
+  <div>|</div>
+  <div>共 <strong id="totalEvents">0</strong> 条行程</div>
+</footer>
+
+<!-- ========== 编辑弹窗 ========== -->
+<div class="modal-overlay" id="modalOverlay" style="display:none">
+  <div class="modal">
+    <h3 id="modalTitle">新增行程</h3>
+    <div class="field">
+      <label>日期</label>
+      <input type="date" id="evtDate">
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>时间</label>
+        <input type="time" id="evtTime">
+      </div>
+      <div class="field">
+        <label>费用 (¥)</label>
+        <input type="number" id="evtCost" placeholder="0" min="0" step="0.01">
+      </div>
+    </div>
+    <div class="field">
+      <label>标题</label>
+      <input type="text" id="evtTitle" placeholder="例如：故宫、入住酒店…" maxlength="50">
+    </div>
+    <div class="field">
+      <label>分类标签</label>
+      <div class="cat-options" id="catOptions"></div>
+    </div>
+    <div class="field">
+      <label>备注</label>
+      <textarea id="evtNote" rows="2" placeholder="备注信息…" maxlength="200"></textarea>
+    </div>
+    <div class="actions">
+      <button class="btn-delete" id="btnDelete" style="display:none">🗑 删除</button>
+      <button class="btn-cancel" id="btnCancel">取消</button>
+      <button class="btn-save" id="btnSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ========== 常量与状态 ========== */
+const CATEGORIES = [
+  { key:'transport', label:'🚗 交通', color:'#0071e3' },
+  { key:'hotel',     label:'🏨 住宿', color:'#8e44ad' },
+  { key:'attraction',label:'🎯 景点', color:'#2ecc71' },
+  { key:'food',      label:'🍜 餐饮', color:'#f39c12' },
+  { key:'shopping',  label:'🛍️ 购物', color:'#e91e63' },
+  { key:'other',     label:'📌 其他', color:'#73818b' },
+];
+const WEEKDAYS = ['日','一','二','三','四','五','六'];
+
+let state = {
+  view: 'month',       // month | week | day
+  cursor: new Date(),  // 当前导航到的日期（月/周日历的锚点）
+  selected: new Date(),// 用户选中的日期（展示时间线）
+  filter: null,        // 当前筛选的分类key，null=全部
+  editingId: null,     // 正在编辑的事件id，null=新增
+};
+
+/* ========== 工具函数 ========== */
+function genId() {
+  try { return crypto.randomUUID(); } catch(e) {}
+  return 'evt_'+Date.now()+'_'+Math.random().toString(36).slice(2,9);
+}
+function fmtDate(d) {
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function parseDate(str) { const [y,m,d] = str.split('-').map(Number); return new Date(y,m-1,d); }
+function sameDay(a,b) { return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+function fmtMoney(n) { return `¥${Number(n||0).toFixed(2)}`; }
+
+/* ========== 数据层 ========== */
+function loadEvents() {
+  try { return JSON.parse(localStorage.getItem('trip_planner_events')||'[]'); }
+  catch(e) { return []; }
+}
+function initDemoData() {
+  if (localStorage.getItem('trip_planner_events')) return;
+  const today = new Date();
+  const t = d => fmtDate(new Date(today.getFullYear(), today.getMonth(), d));
+  const demo = [
+    { id:genId(), date:t(today.getDate()), time:'08:00', title:'早餐 — 酒店自助', category:'food', note:'7:00-10:00开放', cost:0 },
+    { id:genId(), date:t(today.getDate()), time:'09:30', title:'前往天安门广场', category:'attraction', note:'地铁1号线直达', cost:5 },
+    { id:genId(), date:t(today.getDate()), time:'12:00', title:'午餐 — 全聚德烤鸭', category:'food', note:'提前一天预约', cost:180 },
+    { id:genId(), date:t(today.getDate()), time:'14:30', title:'故宫博物院', category:'attraction', note:'门票需提前预约，带身份证', cost:60 },
+    { id:genId(), date:t(today.getDate()), time:'18:00', title:'返回酒店休息', category:'hotel', note:'北京王府井希尔顿', cost:680 },
+    { id:genId(), date:t(today.getDate()+1), time:'08:30', title:'八达岭长城', category:'attraction', note:'S2线火车，约1小时', cost:40 },
+    { id:genId(), date:t(today.getDate()+1), time:'13:00', title:'午餐 — 农家菜', category:'food', note:'长城脚下的餐厅', cost:80 },
+    { id:genId(), date:t(today.getDate()+2), time:'10:00', title:'购物 — 王府井步行街', category:'shopping', note:'特产采购', cost:300 },
+  ];
+  localStorage.setItem('trip_planner_events', JSON.stringify(demo));
+}
+function saveEvents(events) { localStorage.setItem('trip_planner_events', JSON.stringify(events)); }
+
+function getEventsByDate(dateStr) {
+  return loadEvents().filter(e => e.date === dateStr).sort((a,b) => (a.time||'23:59').localeCompare(b.time||'23:59'));
+}
+function getEventsByMonth(year, month) {
+  const prefix = `${year}-${String(month+1).padStart(2,'0')}`;
+  return loadEvents().filter(e => e.date.startsWith(prefix));
+}
+
+/* ========== DOM引用 ========== */
+const $ = id => document.getElementById(id);
+const weekdayRow = $('weekdayRow'), dayGrid = $('dayGrid'), weekGrid = $('weekGrid');
+const dateLabel = $('dateLabel'), selectedDateLabel = $('selectedDateLabel');
+const timelineList = $('timelineList'), filterBar = $('filterBar');
+const modalOverlay = $('modalOverlay');
+
+/* ========== 渲染日历 ========== */
+function renderCalendar() {
+  if (state.view === 'month') renderMonthView();
+  else if (state.view === 'week') renderWeekView();
+  else if (state.view === 'day') renderMonthView(); // 日视图也用日历，但选中日=光标日
+}
+function renderMonthView() {
+  weekGrid.style.display = 'none'; dayGrid.style.display = '';
+  weekdayRow.innerHTML = WEEKDAYS.map(d => `<div>${d}</div>`).join('');
+
+  const y = state.cursor.getFullYear(), m = state.cursor.getMonth();
+  dateLabel.textContent = `${y}年${m+1}月`;
+
+  const firstDay = new Date(y,m,1).getDay();
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const daysInPrev = new Date(y,m,0).getDate();
+
+  const events = getEventsByMonth(y,m);
+  const dateSet = new Set(events.map(e=>e.date));
+  const todayStr = fmtDate(new Date());
+  const selStr = fmtDate(state.selected);
+
+  let html = '';
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+  for (let i=0; i<totalCells; i++) {
+    let dayNum, dateStr, cls = '';
+    if (i < firstDay) {
+      dayNum = daysInPrev - firstDay + i + 1;
+      dateStr = fmtDate(new Date(y,m-1,dayNum));
+      cls = 'other-month';
+    } else if (i >= firstDay + daysInMonth) {
+      dayNum = i - firstDay - daysInMonth + 1;
+      dateStr = fmtDate(new Date(y,m+1,dayNum));
+      cls = 'other-month';
+    } else {
+      dayNum = i - firstDay + 1;
+      dateStr = fmtDate(new Date(y,m,dayNum));
+    }
+    if (dateStr === todayStr) cls += ' today';
+    if (dateStr === selStr) cls += ' selected';
+
+    const hasEvents = dateSet.has(dateStr);
+    const dayEvents = hasEvents ? events.filter(e=>e.date===dateStr) : [];
+    // 去重分类
+    const cats = [...new Set(dayEvents.map(e=>e.category))];
+    const dots = cats.map(c => {
+      const cat = CATEGORIES.find(x=>x.key===c);
+      return `<span class="dot" style="background:${cat?cat.color:'#999'}"></span>`;
+    }).join('');
+
+    html += `<div class="day-cell${cls?' '+cls:''}" data-date="${dateStr}">
+      <span class="day-num">${dayNum}</span>
+      ${dots?`<span class="dots">${dots}</span>`:''}
+    </div>`;
+  }
+  dayGrid.innerHTML = html;
+}
+function renderWeekView() {
+  dayGrid.style.display = 'none'; weekGrid.style.display = '';
+  weekdayRow.innerHTML = ''; // 周视图自带表头
+
+  const start = getWeekStart(state.cursor);
+  const todayStr = fmtDate(new Date());
+  const selStr = fmtDate(state.selected);
+  const end = new Date(start); end.setDate(end.getDate()+6);
+  dateLabel.textContent = `${start.getMonth()+1}月${start.getDate()}日 - ${end.getMonth()+1}月${end.getDate()}日`;
+
+  let html = '';
+  for (let i=0; i<7; i++) {
+    const d = new Date(start); d.setDate(d.getDate()+i);
+    const ds = fmtDate(d);
+    const dayEvents = getEventsByDate(ds);
+    let cls = '';
+    if (ds === todayStr) cls += ' today';
+    if (ds === selStr) cls += ' selected';
+
+    const eventHtml = dayEvents.slice(0,5).map(e => {
+      const cat = CATEGORIES.find(c=>c.key===e.category);
+      return `<div class="week-event" style="background:${cat?cat.color:'#999'}">${e.time?e.time.slice(0,5):''} ${e.title}</div>`;
+    }).join('');
+    const more = dayEvents.length > 5 ? `<div style="font-size:10px;color:var(--sub);padding:2px 4px">+${dayEvents.length-5}条</div>` : '';
+
+    html += `<div class="week-col${cls?' '+cls:''}" data-date="${ds}">
+      <div class="week-day-header">${WEEKDAYS[d.getDay()]}</div>
+      <div class="week-day-num">${d.getDate()}</div>
+      <div class="week-events">${eventHtml}${more}</div>
+    </div>`;
+  }
+  weekGrid.innerHTML = html;
+}
+function getWeekStart(d) {
+  const day = d.getDay();
+  const start = new Date(d); start.setDate(d.getDate()-day);
+  return start;
+}
+
+/* ========== 渲染时间线 ========== */
+function renderTimeline() {
+  const selStr = fmtDate(state.selected);
+  const d = state.selected;
+  const today = new Date();
+  const isToday = sameDay(d, today);
+  selectedDateLabel.innerHTML = `${d.getMonth()+1}月${d.getDate()}日 ${WEEKDAYS[d.getDay()]}${isToday?' <small>今天</small>':''}`;
+
+  let events = getEventsByDate(selStr);
+  if (state.filter) events = events.filter(e => e.category === state.filter);
+
+  if (!events.length) {
+    timelineList.innerHTML = `<div class="timeline-empty">
+      <div class="icon">📭</div><p>${state.filter?'该分类下暂无安排':'暂无行程安排'}</p>
+      <p style="font-size:12px;margin-top:4px">点击右上角「＋新增行程」添加</p>
+    </div>`;
+    updateBudget([]);
+    return;
+  }
+
+  timelineList.innerHTML = events.map(e => {
+    const cat = CATEGORIES.find(c=>c.key===e.category)||{};
+    return `<div class="event-card cat-${e.category}" data-id="${e.id}">
+      <div class="time-col"><span class="time">${e.time?e.time.slice(0,5):'--:--'}</span><span class="cat-dot"></span></div>
+      <div class="info"><div class="title">${escHtml(e.title)}</div>
+      ${e.note?`<div class="note">${escHtml(e.note)}</div>`:''}</div>
+      ${e.cost>0?`<div class="cost">${fmtMoney(e.cost)}</div>`:''}
+    </div>`;
+  }).join('');
+
+  updateBudget(events);
+}
+function escHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+/* ========== 筛选栏 ========== */
+function renderFilterBar() {
+  const chips = [{key:null, label:'全部'}].concat(CATEGORIES.map(c=>({key:c.key, label:c.label})));
+  filterBar.innerHTML = chips.map(c =>
+    `<button class="filter-chip${state.filter===c.key?' active':''}" data-cat="${c.key||''}">${c.label}</button>`
+  ).join('');
+}
+
+/* ========== 预算 ========== */
+function updateBudget(dayEvents) {
+  $('dayBudget').textContent = fmtMoney(dayEvents.reduce((s,e)=>s+(+e.cost||0),0));
+  const mEvents = getEventsByMonth(state.cursor.getFullYear(), state.cursor.getMonth());
+  $('monthBudget').textContent = fmtMoney(mEvents.reduce((s,e)=>s+(+e.cost||0),0));
+  $('totalEvents').textContent = loadEvents().length;
+}
+
+/* ========== 弹窗 ========== */
+function openModal(eventData=null) {
+  state.editingId = eventData ? eventData.id : null;
+  $('modalTitle').textContent = eventData ? '编辑行程' : '新增行程';
+  $('evtDate').value = eventData ? eventData.date : fmtDate(state.selected);
+  $('evtTime').value = eventData ? (eventData.time||'') : '';
+  $('evtTitle').value = eventData ? eventData.title : '';
+  $('evtCost').value = eventData ? (eventData.cost||'') : '';
+  $('evtNote').value = eventData ? (eventData.note||'') : '';
+  $('btnDelete').style.display = eventData ? '' : 'none';
+
+  // 分类按钮
+  const selCat = eventData ? eventData.category : 'attraction';
+  $('catOptions').innerHTML = CATEGORIES.map(c =>
+    `<button data-cat="${c.key}" class="${c.key===selCat?'selected':''}" style="${c.key===selCat?`border-color:${c.color};color:${c.color};background:${c.color}15`:''}">${c.label}</button>`
+  ).join('');
+
+  modalOverlay.style.display = '';
+  $('evtTitle').focus();
+}
+function closeModal() { modalOverlay.style.display = 'none'; state.editingId = null; }
+function getFormData() {
+  const catBtn = $('catOptions').querySelector('.selected');
+  return {
+    id: state.editingId || genId(),
+    date: $('evtDate').value,
+    time: $('evtTime').value,
+    title: $('evtTitle').value.trim(),
+    category: catBtn ? catBtn.dataset.cat : 'other',
+    note: $('evtNote').value.trim(),
+    cost: parseFloat($('evtCost').value)||0,
+  };
+}
+
+/* ========== 事件绑定 ========== */
+// 视图切换
+$('viewBtns').addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON') return;
+  $('viewBtns').querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+  e.target.classList.add('active');
+  state.view = e.target.dataset.view;
+  if (state.view === 'day') state.selected = new Date(state.cursor);
+  renderAll();
+});
+
+// 导航
+$('btnPrev').addEventListener('click', () => {
+  if (state.view === 'month') state.cursor.setMonth(state.cursor.getMonth()-1);
+  else if (state.view === 'week') state.cursor.setDate(state.cursor.getDate()-7);
+  else state.cursor.setDate(state.cursor.getDate()-1);
+  if (state.view==='day') state.selected = new Date(state.cursor);
+  renderAll();
+});
+$('btnNext').addEventListener('click', () => {
+  if (state.view === 'month') state.cursor.setMonth(state.cursor.getMonth()+1);
+  else if (state.view === 'week') state.cursor.setDate(state.cursor.getDate()+7);
+  else state.cursor.setDate(state.cursor.getDate()+1);
+  if (state.view==='day') state.selected = new Date(state.cursor);
+  renderAll();
+});
+$('btnToday').addEventListener('click', () => {
+  state.cursor = new Date(); state.selected = new Date(); renderAll();
+});
+
+// 日历点击
+dayGrid.addEventListener('click', e => {
+  const cell = e.target.closest('.day-cell'); if (!cell) return;
+  state.selected = parseDate(cell.dataset.date);
+  if (state.view === 'day') state.cursor = new Date(state.selected);
+  renderAll();
+});
+weekGrid.addEventListener('click', e => {
+  const col = e.target.closest('.week-col'); if (!col) return;
+  state.selected = parseDate(col.dataset.date);
+  renderAll();
+});
+
+// 时间线点击 → 编辑
+timelineList.addEventListener('click', e => {
+  const card = e.target.closest('.event-card'); if (!card) return;
+  const events = loadEvents();
+  const evt = events.find(ev=>ev.id===card.dataset.id);
+  if (evt) openModal(evt);
+});
+
+// 筛选
+filterBar.addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON') return;
+  const cat = e.target.dataset.cat || null;
+  state.filter = cat;
+  renderFilterBar();
+  renderTimeline();
+});
+
+// 弹窗操作
+$('btnAdd').addEventListener('click', () => openModal());
+$('btnCancel').addEventListener('click', closeModal);
+$('modalOverlay').addEventListener('click', e => { if (e.target === modalOverlay) closeModal(); });
+
+$('btnSave').addEventListener('click', () => {
+  const data = getFormData();
+  if (!data.title) { alert('请输入行程标题'); return; }
+  if (!data.date) { alert('请选择日期'); return; }
+  const events = loadEvents();
+  if (state.editingId) {
+    const idx = events.findIndex(e=>e.id===state.editingId);
+    if (idx !== -1) events[idx] = data;
+  } else {
+    events.push(data);
+  }
+  saveEvents(events);
+  closeModal();
+  renderAll();
+});
+$('btnDelete').addEventListener('click', () => {
+  if (!confirm('确定删除这条行程吗？')) return;
+  const events = loadEvents().filter(e=>e.id!==state.editingId);
+  saveEvents(events);
+  closeModal();
+  renderAll();
+});
+
+// 弹窗分类选择
+$('catOptions').addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON') return;
+  $('catOptions').querySelectorAll('button').forEach(b=>{
+    b.classList.remove('selected'); b.style.cssText = '';
+  });
+  e.target.classList.add('selected');
+  const cat = CATEGORIES.find(c=>c.key===e.target.dataset.cat);
+  if (cat) e.target.style.cssText = `border-color:${cat.color};color:${cat.color};background:${cat.color}15`;
+});
+
+// 键盘关闭
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && modalOverlay.style.display !== 'none') closeModal();
+});
+
+/* ========== 完整渲染 ========== */
+function renderAll() {
+  renderCalendar();
+  renderFilterBar();
+  renderTimeline();
+}
+
+// 初始化
+initDemoData();
+renderAll();
+</script>
+</body>
+</html>
