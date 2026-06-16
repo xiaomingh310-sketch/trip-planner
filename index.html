@@ -124,6 +124,40 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 
 .cat-shopping{border-left-color:var(--cat-shopping)}.cat-shopping .cat-dot{background:var(--cat-shopping)}
 .cat-other{border-left-color:var(--cat-other)}.cat-other .cat-dot{background:var(--cat-other)}
 
+/* ========== 标签管理 ========== */
+.btn-manage-tags{
+  padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500;
+  background:transparent;color:var(--sub);border:1px dashed var(--border);
+  transition:all .2s;white-space:nowrap;margin-left:4px;
+}
+.btn-manage-tags:hover{color:var(--accent);border-color:var(--accent)}
+.tag-manager{
+  position:fixed;inset:0;z-index:250;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.4);padding:20px;
+}
+.tag-manager.hidden{display:none}
+.tag-panel{
+  background:var(--card);border-radius:var(--radius);padding:20px;width:100%;max-width:380px;
+  max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);
+}
+.tag-panel h3{font-size:17px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.tag-row{display:flex;align-items:center;gap:8px;padding:8px 10px;margin:4px 0;border-radius:var(--radius-sm);background:var(--bg)}
+.tag-row .tag-emoji{font-size:18px;width:28px;text-align:center}
+.tag-row .tag-name{flex:1;font-size:14px;font-weight:500}
+.tag-row .tag-color{width:16px;height:16px;border-radius:50%;flex-shrink:0}
+.tag-row .tag-del{
+  width:26px;height:26px;border-radius:50%;border:none;background:transparent;color:var(--sub);
+  cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .15s;
+}
+.tag-row .tag-del:hover{background:#fee;color:var(--danger)}
+.tag-add-row{display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap}
+.tag-add-row input{padding:6px 10px;flex:1;min-width:80px;font-size:13px}
+.tag-add-row select{padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:16px;cursor:pointer}
+.color-presets{display:flex;gap:4px;flex-wrap:wrap}
+.color-presets button{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;flex-shrink:0;transition:border .15s}
+.color-presets button.selected{border-color:var(--text);transform:scale(1.15)}
+.btn-tag-save{padding:6px 14px;border-radius:20px;background:var(--accent);color:#fff;font-size:12px;font-weight:600}
+
 /* ========== 底部状态栏 ========== */
 .footer{
   background:var(--card);border-top:1px solid var(--border);padding:10px 20px;
@@ -208,6 +242,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 
     <div class="timeline-top">
       <div class="selected-date" id="selectedDateLabel">6月16日 星期一 <small>今天</small></div>
       <div class="filter-bar" id="filterBar"></div>
+      <button class="btn-manage-tags" id="btnManageTags">⚙️ 管理标签</button>
     </div>
     <div class="timeline-list" id="timelineList"></div>
   </div>
@@ -260,16 +295,46 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 
   </div>
 </div>
 
+<!-- ========== 标签管理弹窗 ========== -->
+<div class="tag-manager hidden" id="tagManager">
+  <div class="tag-panel">
+    <h3>🏷️ 管理标签</h3>
+    <div id="tagList"></div>
+    <div class="tag-add-row">
+      <select id="tagEmoji">
+        <option>✈️</option><option>🚌</option><option>🚕</option><option>🎫</option><option>📸</option>
+        <option>🏖️</option><option>🏔️</option><option>🏛️</option><option>🎭</option><option>🎤</option>
+        <option>☕</option><option>🍷</option><option>🏥</option><option>💼</option><option>🎁</option>
+        <option>📝</option><option>⭐</option><option>🔥</option><option>💡</option><option>🏃</option>
+      </select>
+      <input type="text" id="tagName" placeholder="标签名称" maxlength="10">
+      <div class="color-presets" id="colorPresets"></div>
+      <button class="btn-tag-save" id="btnTagSave">添加</button>
+    </div>
+    <div style="margin-top:12px;text-align:right">
+      <button class="btn-cancel" id="btnTagClose" style="padding:6px 16px;font-size:13px">关闭</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ========== 常量与状态 ========== */
-const CATEGORIES = [
-  { key:'transport', label:'🚗 交通', color:'#0071e3' },
-  { key:'hotel',     label:'🏨 住宿', color:'#8e44ad' },
-  { key:'attraction',label:'🎯 景点', color:'#2ecc71' },
-  { key:'food',      label:'🍜 餐饮', color:'#f39c12' },
-  { key:'shopping',  label:'🛍️ 购物', color:'#e91e63' },
-  { key:'other',     label:'📌 其他', color:'#73818b' },
+const DEFAULT_CATEGORIES = [
+  { key:'transport', label:'🚗 交通', color:'#0071e3', builtin:true },
+  { key:'hotel',     label:'🏨 住宿', color:'#8e44ad', builtin:true },
+  { key:'attraction',label:'🎯 景点', color:'#2ecc71', builtin:true },
+  { key:'food',      label:'🍜 餐饮', color:'#f39c12', builtin:true },
+  { key:'shopping',  label:'🛍️ 购物', color:'#e91e63', builtin:true },
+  { key:'other',     label:'📌 其他', color:'#73818b', builtin:true },
 ];
+const COLOR_PRESETS = ['#0071e3','#8e44ad','#2ecc71','#f39c12','#e91e63','#ff6b6b','#20c997','#ff922b','#845ef7','#339af0','#ff6348','#2ed573'];
+
+function loadCustomCategories() {
+  try { return JSON.parse(localStorage.getItem('trip_planner_categories')||'[]'); }
+  catch(e) { return []; }
+}
+function saveCustomCategories(cats) { localStorage.setItem('trip_planner_categories', JSON.stringify(cats)); }
+function getCategories() { return [...DEFAULT_CATEGORIES, ...loadCustomCategories()]; }
 const WEEKDAYS = ['日','一','二','三','四','五','六'];
 
 let state = {
@@ -377,7 +442,7 @@ function renderMonthView() {
     // 去重分类
     const cats = [...new Set(dayEvents.map(e=>e.category))];
     const dots = cats.map(c => {
-      const cat = CATEGORIES.find(x=>x.key===c);
+      const cat = getCategories().find(x=>x.key===c);
       return `<span class="dot" style="background:${cat?cat.color:'#999'}"></span>`;
     }).join('');
 
@@ -408,7 +473,7 @@ function renderWeekView() {
     if (ds === selStr) cls += ' selected';
 
     const eventHtml = dayEvents.slice(0,5).map(e => {
-      const cat = CATEGORIES.find(c=>c.key===e.category);
+      const cat = getCategories().find(c=>c.key===e.category);
       return `<div class="week-event" style="background:${cat?cat.color:'#999'}">${e.time?e.time.slice(0,5):''} ${e.title}</div>`;
     }).join('');
     const more = dayEvents.length > 5 ? `<div style="font-size:10px;color:var(--sub);padding:2px 4px">+${dayEvents.length-5}条</div>` : '';
@@ -448,9 +513,11 @@ function renderTimeline() {
   }
 
   timelineList.innerHTML = events.map(e => {
-    const cat = CATEGORIES.find(c=>c.key===e.category)||{};
-    return `<div class="event-card cat-${e.category}" data-id="${e.id}">
-      <div class="time-col"><span class="time">${e.time?e.time.slice(0,5):'--:--'}</span><span class="cat-dot"></span></div>
+    const cat = getCategories().find(c=>c.key===e.category)||{color:'#999'};
+    const isBuiltin = DEFAULT_CATEGORIES.some(c=>c.key===e.category);
+    const inlineStyle = isBuiltin ? '' : `border-left-color:${cat.color};`;
+    return `<div class="event-card${isBuiltin?' cat-'+e.category:''}" data-id="${e.id}" style="${inlineStyle}">
+      <div class="time-col"><span class="time">${e.time?e.time.slice(0,5):'--:--'}</span><span class="cat-dot" style="${isBuiltin?'':'background:'+cat.color}"></span></div>
       <div class="info"><div class="title">${escHtml(e.title)}</div>
       ${e.note?`<div class="note">${escHtml(e.note)}</div>`:''}</div>
       ${e.cost>0?`<div class="cost">${fmtMoney(e.cost)}</div>`:''}
@@ -463,7 +530,7 @@ function escHtml(s) { const d=document.createElement('div'); d.textContent=s; re
 
 /* ========== 筛选栏 ========== */
 function renderFilterBar() {
-  const chips = [{key:null, label:'全部'}].concat(CATEGORIES.map(c=>({key:c.key, label:c.label})));
+  const chips = [{key:null, label:'全部'}].concat(getCategories().map(c=>({key:c.key, label:c.label})));
   filterBar.innerHTML = chips.map(c =>
     `<button class="filter-chip${state.filter===c.key?' active':''}" data-cat="${c.key||''}">${c.label}</button>`
   ).join('');
@@ -490,7 +557,7 @@ function openModal(eventData=null) {
 
   // 分类按钮
   const selCat = eventData ? eventData.category : 'attraction';
-  $('catOptions').innerHTML = CATEGORIES.map(c =>
+  $('catOptions').innerHTML = getCategories().map(c =>
     `<button data-cat="${c.key}" class="${c.key===selCat?'selected':''}" style="${c.key===selCat?`border-color:${c.color};color:${c.color};background:${c.color}15`:''}">${c.label}</button>`
   ).join('');
 
@@ -606,13 +673,85 @@ $('catOptions').addEventListener('click', e => {
     b.classList.remove('selected'); b.style.cssText = '';
   });
   e.target.classList.add('selected');
-  const cat = CATEGORIES.find(c=>c.key===e.target.dataset.cat);
+  const cat = getCategories().find(c=>c.key===e.target.dataset.cat);
   if (cat) e.target.style.cssText = `border-color:${cat.color};color:${cat.color};background:${cat.color}15`;
 });
 
 // 键盘关闭
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && modalOverlay.style.display !== 'none') closeModal();
+  if (e.key === 'Escape') {
+    if ($('tagManager') && !$('tagManager').classList.contains('hidden')) closeTagManager();
+    if (modalOverlay.style.display !== 'none') closeModal();
+  }
+});
+
+/* ========== 标签管理器 ========== */
+const tagManager = $('tagManager');
+function openTagManager() { tagManager.classList.remove('hidden'); renderTagPanel(); }
+function closeTagManager() { tagManager.classList.add('hidden'); }
+function renderTagPanel() {
+  const cats = getCategories();
+  $('tagList').innerHTML = cats.map(c => {
+    const isBuiltin = DEFAULT_CATEGORIES.some(d=>d.key===c.key);
+    return `<div class="tag-row">
+      <span class="tag-name" style="flex:1">${escHtml(c.label)}</span>
+      <span class="tag-color" style="background:${c.color}"></span>
+      ${!isBuiltin?`<button class="tag-del" data-key="${c.key}" title="删除">×</button>`:''}
+    </div>`;
+  }).join('');
+  // 渲染颜色预设
+  if (!$('colorPresets').dataset.rendered) {
+    $('colorPresets').innerHTML = COLOR_PRESETS.map((co,i) =>
+      `<button style="background:${co}" data-color="${co}" class="${i===0?'selected':''}"></button>`
+    ).join('');
+    $('colorPresets').dataset.rendered = '1';
+  }
+}
+// 标签管理器事件
+$('btnManageTags').addEventListener('click', openTagManager);
+$('btnTagClose').addEventListener('click', closeTagManager);
+$('tagManager').addEventListener('click', e => { if (e.target === tagManager) closeTagManager(); });
+// 删除自定义标签
+$('tagList').addEventListener('click', e => {
+  const del = e.target.closest('.tag-del'); if (!del) return;
+  const customs = loadCustomCategories().filter(c=>c.key!==del.dataset.key);
+  saveCustomCategories(customs);
+  // 清除使用该标签的行程
+  const events = loadEvents();
+  const hasEventsWithCat = events.some(e=>e.category===del.dataset.key);
+  if (hasEventsWithCat && !confirm('有行程使用了该标签，删除后这些行程将变为「📌 其他」。确定删除？')) return;
+  saveEvents(events.map(e=>e.category===del.dataset.key ? {...e, category:'other'} : e));
+  if (state.filter === del.dataset.key) { state.filter = null; renderFilterBar(); }
+  renderTagPanel();
+  renderTimeline();
+  renderCalendar();
+});
+// 颜色预设选择
+$('colorPresets').addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON') return;
+  $('colorPresets').querySelectorAll('button').forEach(b=>b.classList.remove('selected'));
+  e.target.classList.add('selected');
+});
+// 添加新标签
+$('btnTagSave').addEventListener('click', () => {
+  const name = $('tagName').value.trim();
+  if (!name) { alert('请输入标签名称'); return; }
+  const key = 'custom_'+Date.now();
+  const emoji = $('tagEmoji').value;
+  const colorBtn = $('colorPresets').querySelector('.selected');
+  const color = colorBtn ? colorBtn.dataset.color : COLOR_PRESETS[0];
+  const exists = getCategories().some(c=>c.label.includes(name));
+  if (exists) { alert('已存在同名标签'); return; }
+  // 检查是否有使用该key的行程（例如并发场景）
+  const customs = loadCustomCategories();
+  customs.push({key, label:emoji+' '+name, color, builtin:false});
+  saveCustomCategories(customs);
+  $('tagName').value = '';
+  renderTagPanel();
+  // 刷新所有UI
+  renderFilterBar();
+  renderCalendar();
+  renderTimeline();
 });
 
 /* ========== 完整渲染 ========== */
